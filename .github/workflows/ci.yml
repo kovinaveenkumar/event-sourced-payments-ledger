@@ -7,7 +7,7 @@ on:
 
 jobs:
   command-service:
-    name: command-service (JUnit + Cucumber)
+    name: command-service (JUnit + Cucumber + Testcontainers)
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: command-service } }
     steps:

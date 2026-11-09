@@ -30,7 +30,7 @@ flowchart LR
 | Kafka | Events keyed by account so each account stays in order, duplicates skipped on the consumer side, bad messages saved to a dead letters table |
 | Data structures and algorithms | A sliding time window that updates in constant time, request fingerprints for safe retries, version numbers to spot duplicates and missing events |
 | REST APIs | Clear URLs, an `Idempotency-Key` header so a retry never charges twice, proper status codes and error bodies, Swagger docs |
-| Testing | JUnit 5, MockMvc, Cucumber (BDD) scenarios, ScalaTest, and property-based tests |
+| Testing | JUnit 5, MockMvc, Cucumber (BDD) scenarios, ScalaTest, property-based tests, and Testcontainers integration tests against real Postgres and Kafka |
 | CI | GitHub Actions builds and tests each service, then starts everything with Docker and runs an end-to-end test |
 | Linux and DevOps | Dockerfiles, Docker Compose, Bash scripts, and an Ansible playbook to deploy on a Linux server |
 | Production support | Health checks, JSON logs, simple metrics, and a [runbook](docs/RUNBOOK.md) for on-call |
@@ -141,8 +141,12 @@ transfer from A to B and one from B to A at the same time each waited for the ot
 it by always saving events in the same account order, and by retrying with a short random
 wait. After the fix, two runs of 500 transfers had no errors and the totals matched exactly.
 
+To keep it fixed, I added an integration test (`JdbcEventStoreIT`) that runs against a real
+Postgres in Docker using Testcontainers and fires 200 transfers both ways at once. I checked
+that it fails when I take the fix out, and passes with it in.
+
 ## What I would add next
 
 Snapshots so long account histories load faster, fraud alerts on their own Kafka topic,
-processing Kafka partitions in parallel, Testcontainers integration tests, and Prometheus
+processing Kafka partitions in parallel, and Prometheus
 dashboards for lag and backlog.

@@ -60,7 +60,7 @@ works it out directly from the events.
 | Money | Stored as `long` cents so there is no rounding error. `Money.of(...)` rejects zero, negatives, more than 2 decimals and unknown currencies. |
 | Two requests at once | Every event has the account's next version number, and Postgres has `UNIQUE (account_id, version)`. If two requests race, only one can save version N. The other reloads, checks the balance again, and retries (up to 6 tries with a short random wait). So a race can't overdraw an account. |
 | Transfers | The debit (`TransferSent`) and the credit (`TransferReceived`) are saved in one database transaction. Both accounts are in the same database, so I don't need a saga. |
-| Deadlocks | I always insert events sorted by account id. Without this, A to B and B to A at the same moment could lock each other. I found this with the load test. |
+| Deadlocks | I always insert events sorted by account id. Without this, A to B and B to A at the same moment could lock each other. I found this with the load test, and `JdbcEventStoreIT` now checks it against a real Postgres. |
 | Safe retries | Clients can send an `Idempotency-Key` header. I store the key, a hash of the request and the result in the same transaction as the events. A retry gets the first result back. The same key with a different request gets `422 IDEMPOTENCY_KEY_REUSED`. |
 | Sending to Kafka | Commands only write to Postgres. A small job (`OutboxRelay`) checks every 250 ms for events not yet sent and publishes them in order. This way I never have "saved in the DB but not sent to Kafka" or the other way round. A message can be sent twice, so the consumer has to handle duplicates. |
 | Errors | Standard problem-detail JSON with a `code` field like `INSUFFICIENT_FUNDS` or `CURRENCY_MISMATCH`. |
@@ -143,5 +143,4 @@ connection pool and also serves the AngularJS dashboard.
 - Snapshots every N events so long account histories load faster.
 - Fraud alerts on their own Kafka topic for other teams to consume.
 - Process Kafka partitions in parallel to scale the processor.
-- Testcontainers tests for the JDBC store and the full Kafka round trip.
 - Prometheus metrics and dashboards for consumer lag and outbox backlog.
