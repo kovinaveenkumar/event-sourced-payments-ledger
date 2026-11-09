@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  command-service:
+    name: command-service (JUnit + Cucumber)
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: command-service } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17", cache: maven }
+      - run: mvn -B verify
+      - name: Publish Cucumber report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cucumber-report
+          path: command-service/target/cucumber-report.html
+
+  query-service:
+    name: query-service
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: query-service } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17", cache: maven }
+      - run: mvn -B verify
+
+  ledger-processor:
+    name: ledger-processor (ScalaTest)
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: ledger-processor } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17", cache: sbt }
+      - uses: sbt/setup-sbt@v1
+      - run: sbt -batch test
+
+  lint:
+    name: shell + python + ansible lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck scripts/*.sh
+      - run: python3 -m py_compile scripts/load_gen.py
+      - run: pipx install ansible-core && ansible-galaxy collection install ansible.posix
+      - run: ansible-playbook --syntax-check -i deploy/ansible/inventory.ini deploy/ansible/playbook.yml
+
+  end-to-end:
+    name: docker compose + smoke test
+    needs: [command-service, query-service, ledger-processor]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start the stack
+        run: ./scripts/run-local.sh
+      - name: Smoke test
+        run: ./scripts/smoke-test.sh
+      - name: Replay projections and compare totals
+        run: ./scripts/replay-projections.sh
+      - name: Service logs on failure
+        if: failure()
+        run: docker compose logs --tail=200
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

@@ -1,0 +1,46 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: command-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/eventstore}
+    username: ${DB_USER:ledger}
+    password: ${DB_PASSWORD:ledger}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+ledger:
+  kafka:
+    topic: ${LEDGER_TOPIC:ledger-events}
+  outbox:
+    enabled: true
+    poll-interval-ms: 250
+    batch-size: 200
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:8082}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  structured:
+    format:
+      console: ${LOG_FORMAT:logstash}

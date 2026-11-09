@@ -1,0 +1,79 @@
+---
+# Deploys the payments ledger to a Linux host with Docker Compose.
+#
+#   ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/playbook.yml
+#   ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/playbook.yml --tags deploy   # code only
+#
+# Safe to run again: it only rebuilds when the code changed.
+- name: Deploy payments ledger
+  hosts: ledger
+  become: true
+  vars:
+    app_dir: /opt/payments-ledger
+    repo_root: "{{ playbook_dir }}/../.."
+    health_urls:
+      - http://localhost:8081/actuator/health
+      - http://localhost:8083/health
+      - http://localhost:8082/actuator/health
+
+  tasks:
+    - name: Install Docker engine and the compose plugin
+      tags: [setup]
+      ansible.builtin.apt:
+        name: [docker.io, docker-compose-v2, rsync, curl]
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Ensure Docker is running and starts on boot
+      tags: [setup]
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Create application directory
+      tags: [deploy]
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Copy source, compose file and infra config
+      tags: [deploy]
+      ansible.posix.synchronize:
+        src: "{{ repo_root }}/"
+        dest: "{{ app_dir }}/"
+        delete: true
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=**/target"
+          - "--exclude=**/.bsp"
+          - "--exclude=**/project/target"
+      register: sync
+
+    - name: Build images and (re)start changed services
+      tags: [deploy]
+      ansible.builtin.command:
+        cmd: docker compose up -d --build --remove-orphans
+        chdir: "{{ app_dir }}"
+      when: sync.changed
+      changed_when: true
+
+    - name: Wait for every service to report healthy
+      tags: [deploy, verify]
+      ansible.builtin.uri:
+        url: "{{ item }}"
+        status_code: 200
+      loop: "{{ health_urls }}"
+      register: health
+      until: health.status == 200
+      retries: 40
+      delay: 5
+
+    - name: Run the end-to-end smoke test on the host
+      tags: [verify]
+      ansible.builtin.command:
+        cmd: ./scripts/smoke-test.sh
+        chdir: "{{ app_dir }}"
+      changed_when: false

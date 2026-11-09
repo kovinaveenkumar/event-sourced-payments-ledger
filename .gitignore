@@ -1,0 +1,10 @@
+target/
+.bsp/
+.metals/
+.bloop/
+.vscode/
+.idea/
+*.iml
+.DS_Store
+__pycache__/
+*.log

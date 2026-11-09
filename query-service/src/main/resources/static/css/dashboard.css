@@ -1,0 +1,7 @@
+body { background: #f4f6f9; }
+.stat .stat-label { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: #6c757d; }
+.stat .stat-value { font-size: 1.75rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat .small-value { font-size: 1.1rem; }
+.table td, .table th { font-variant-numeric: tabular-nums; }
+.clickable { cursor: pointer; }
+.status-dot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; margin-right: .3rem; }
