@@ -22,6 +22,14 @@ docker compose exec kafka /opt/kafka/bin/kafka-consumer-groups.sh \
 docker compose exec postgres psql -U ledger -d eventstore -c \
   "SELECT COUNT(*), MIN(occurred_at) FROM events WHERE published_at IS NULL;"
 
+# Fraud alerts saved but not yet sent to the fraud-alerts topic
+docker compose exec postgres psql -U ledger -d readmodel -c \
+  "SELECT COUNT(*), MIN(created_at) FROM fraud_alerts WHERE published_at IS NULL;"
+
+# Read the fraud-alerts topic
+docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server kafka:19092 --topic fraud-alerts --from-beginning --timeout-ms 5000
+
 # Latest dead letters
 docker compose exec postgres psql -U ledger -d readmodel -c \
   "SELECT id, partition_no, offset_no, reason, created_at FROM dead_letters ORDER BY id DESC LIMIT 20;"
@@ -76,6 +84,9 @@ It stops the processor, empties the read tables, moves the Kafka consumer back t
 start, starts the processor again, waits until it has caught up, and then checks that the
 account count and total balance match what was there before. The event store is never
 touched.
+
+A replay creates the fraud alerts again, so they are sent to the `fraud-alerts` topic again
+with the same alert ids. Consumers skip ids they have already seen.
 
 ### Restart one service
 

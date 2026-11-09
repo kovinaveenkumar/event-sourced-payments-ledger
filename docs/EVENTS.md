@@ -42,6 +42,24 @@ Example:
 }
 ```
 
+## Fraud alerts topic
+
+Topic: `fraud-alerts`. Key: the account id. Value: a JSON object. The Scala processor sends
+these, so other teams (for example a case-management system) can react to alerts without
+reading my database.
+
+| Field | Type | Notes |
+|---|---|---|
+| `alertId` | UUID | Built from the rule and the event id, so it never changes for the same alert |
+| `accountId` | UUID | The account that sent the money |
+| `rule` | string | `LARGE_TRANSACTION`, `VELOCITY` or `VOLUME` |
+| `detail` | string | Short readable reason |
+| `eventId` | UUID | The payment event that caused the alert |
+| `occurredAt` | ISO-8601 time in UTC | Time of that payment |
+
+An alert can arrive more than once (for example after a crash, or after a replay). Consumers
+should skip any `alertId` they have already handled.
+
 ## Changing the format later
 
 - Adding a new optional field is safe. Readers ignore fields they don't know.

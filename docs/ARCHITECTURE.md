@@ -30,6 +30,7 @@ flowchart LR
     kafka --> lp
     lp --- fraud
     lp -- "update views" --> rm
+    rm -. "alert outbox" .-> alerts{{Kafka topic<br/>fraud-alerts}}
     q --> rm
     client -- "GET queries" --> q
 ```
@@ -123,6 +124,17 @@ payment after it. Alert ids are built from the rule name and the event id, so pr
 event twice can't create a second alert. After a restart, the engine reloads the last
 10 minutes of outgoing payments so the windows aren't empty.
 
+### Sending alerts to Kafka
+
+Alerts are also published to a `fraud-alerts` topic so other systems can act on them. I used
+the same outbox idea as the command service: alerts are saved in the same transaction as the
+balances, and `AlertRelay` sends unsent ones to Kafka every half second and marks them sent.
+
+I didn't send them straight from the stream because a crash between saving and sending would
+lose the alert. The event would come back from Kafka, be skipped as a duplicate, and the alert
+would never go out. With the outbox, an alert can be sent twice but never lost, and the fixed
+alert id lets consumers skip repeats.
+
 ## Read side: query-service
 
 Simple lookups on tables that already match what the screens need. It uses a read-only
@@ -141,6 +153,5 @@ connection pool and also serves the AngularJS dashboard.
 ## What I would add next
 
 - Snapshots every N events so long account histories load faster.
-- Fraud alerts on their own Kafka topic for other teams to consume.
 - Process Kafka partitions in parallel to scale the processor.
 - Prometheus metrics and dashboards for consumer lag and outbox backlog.

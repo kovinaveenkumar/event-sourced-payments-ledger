@@ -43,8 +43,8 @@ services:
       timeout: 10s
       retries: 30
 
-  # Runs once to create the topic. Retention is unlimited because I rebuild the read data
-  # from this topic, so old messages must never be deleted. 3 partitions, keyed by account id.
+  # Runs once to create the topics. ledger-events has unlimited retention because I rebuild the
+  # read data from it, so old messages must never be deleted. Both are keyed by account id.
   kafka-init:
     image: apache/kafka:3.8.0
     depends_on:
@@ -54,7 +54,9 @@ services:
     command:
       - >
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --if-not-exists
-        --topic ledger-events --partitions 3 --replication-factor 1 --config retention.ms=-1
+        --topic ledger-events --partitions 3 --replication-factor 1 --config retention.ms=-1 &&
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --if-not-exists
+        --topic fraud-alerts --partitions 3 --replication-factor 1
     restart: "no"
 
   command-service:

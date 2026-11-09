@@ -8,7 +8,7 @@ import akka.http.scaladsl.server.Route
 import com.typesafe.config.{Config, ConfigFactory}
 import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
 import io.circe.Json
-import ledger.processor.fraud.{FraudConfig, FraudEngine}
+import ledger.processor.fraud.{AlertRelay, FraudConfig, FraudEngine, KafkaAlertSender}
 import ledger.processor.store.ReadModelRepository
 import org.slf4j.LoggerFactory
 
@@ -50,6 +50,14 @@ object Main {
     stream.start()
     log.info(s"Consuming topic ${kafka.getString("topic")} as group ${kafka.getString("group-id")}")
 
+    // Alert outbox: every half second, send unsent fraud alerts to their own Kafka topic.
+    val alertSender = new KafkaAlertSender(kafka.getString("bootstrap-servers"), kafka.getString("alerts-topic"))
+    val alertRelay  = new AlertRelay(repo.unpublishedAlerts, repo.markAlertsPublished, alertSender)
+    val blocking    = system.dispatchers.lookup("ledger.blocking-dispatcher")
+    val alertTask = system.scheduler.scheduleWithFixedDelay(1.second, 500.millis) { () =>
+      Try(alertRelay.publishPending()).failed.foreach(e => log.warn(s"Alert relay failed: ${e.getMessage}"))
+    }(blocking)
+
     val port = ledger.getInt("http.port")
     Http().newServerAt("0.0.0.0", port).bind(routes(repo, stream, metrics)).foreach { binding =>
       log.info(s"Health endpoint listening on ${binding.localAddress}")
@@ -57,7 +65,9 @@ object Main {
 
     CoordinatedShutdown(system).addJvmShutdownHook {
       log.info("Shutting down: stopping consumer and closing the connection pool")
+      alertTask.cancel()
       stream.stop()
+      alertSender.close()
       dataSource.close()
     }
   }

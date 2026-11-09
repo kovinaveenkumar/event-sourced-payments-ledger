@@ -120,6 +120,31 @@ final class ReadModelRepository(ds: DataSource) {
       }
     }
 
+  /** Alerts not yet sent to Kafka, oldest first. */
+  def unpublishedAlerts(limit: Int): Vector[FraudAlert] =
+    Using.resource(ds.getConnection) { c =>
+      Using.resource(c.prepareStatement(
+        """SELECT alert_id, account_id, rule, detail, event_id, occurred_at FROM fraud_alerts
+          |WHERE published_at IS NULL ORDER BY created_at, alert_id LIMIT ?""".stripMargin)) { ps =>
+        ps.setInt(1, limit)
+        Using.resource(ps.executeQuery()) { rs =>
+          Iterator.continually(rs).takeWhile(_.next()).map { r =>
+            FraudAlert(r.getObject("alert_id", classOf[UUID]), r.getObject("account_id", classOf[UUID]),
+              r.getString("rule"), r.getString("detail"), r.getObject("event_id", classOf[UUID]),
+              r.getTimestamp("occurred_at").toInstant)
+          }.toVector
+        }
+      }
+    }
+
+  def markAlertsPublished(ids: Seq[UUID]): Unit =
+    Using.resource(ds.getConnection) { c =>
+      Using.resource(c.prepareStatement("UPDATE fraud_alerts SET published_at = now() WHERE alert_id = ?")) { ps =>
+        ids.foreach { id => ps.setObject(1, id); ps.addBatch() }
+        ps.executeBatch()
+      }
+    }
+
   def ping(): Boolean = Using.resource(ds.getConnection)(_.isValid(2))
 
   private def toView(rs: ResultSet): AccountView =

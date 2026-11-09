@@ -36,6 +36,10 @@ CREATE TABLE IF NOT EXISTS fraud_alerts (
 );
 CREATE INDEX IF NOT EXISTS fraud_alerts_created_idx ON fraud_alerts (created_at DESC);
 
+-- Set once the alert has been sent to the fraud-alerts Kafka topic (outbox for alerts).
+ALTER TABLE fraud_alerts ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS fraud_alerts_unpublished_idx ON fraud_alerts (created_at) WHERE published_at IS NULL;
+
 -- Messages that couldn't be read or applied, kept for someone to check (see docs/RUNBOOK.md).
 CREATE TABLE IF NOT EXISTS dead_letters (
     id           BIGSERIAL    PRIMARY KEY,

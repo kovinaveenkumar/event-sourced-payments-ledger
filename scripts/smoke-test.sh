@@ -69,6 +69,14 @@ alert_raised() { [[ "$(has_alert)" == "True" ]]; }
 retry_until 30 alert_raised || true
 check "velocity alert raised for Alice" "True" "$(has_alert)"
 
+info "The alert is also published to the fraud-alerts Kafka topic"
+alert_on_topic() {
+  docker compose exec -T kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:19092 \
+    --topic fraud-alerts --from-beginning --timeout-ms 5000 2>/dev/null | grep "$alice" | grep -q VELOCITY
+}
+if retry_until 30 alert_on_topic; then on_topic=yes; else on_topic=no; fi
+check "velocity alert on fraud-alerts topic" "yes" "$on_topic"
+
 info "Processor metrics"
 curl -fsS "${PROCESSOR}/metrics"; echo
 

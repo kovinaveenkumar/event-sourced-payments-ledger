@@ -27,7 +27,7 @@ flowchart LR
 | Core Java | Java 17 records and sealed interfaces, an account model that never changes in place, money kept as whole cents, safe handling of two requests hitting the same account |
 | Scala and functional programming | Akka Streams to read from Kafka, pure functions for the balance and fraud logic, circe to read JSON, cats `Validated` to collect all errors at once, cats `CommutativeGroup` for the fraud window |
 | DDD, CQRS, event sourcing | One service writes events, another serves reads. The read data can be deleted and rebuilt from Kafka at any time |
-| Kafka | Events keyed by account so each account stays in order, duplicates skipped on the consumer side, bad messages saved to a dead letters table |
+| Kafka | Events keyed by account so each account stays in order, duplicates skipped on the consumer side, bad messages saved to a dead letters table. The Scala service also publishes fraud alerts to their own `fraud-alerts` topic |
 | Data structures and algorithms | A sliding time window that updates in constant time, request fingerprints for safe retries, version numbers to spot duplicates and missing events |
 | REST APIs | Clear URLs, an `Idempotency-Key` header so a retry never charges twice, proper status codes and error bodies, Swagger docs |
 | Testing | JUnit 5, MockMvc, Cucumber (BDD) scenarios, ScalaTest, property-based tests, and Testcontainers integration tests against real Postgres and Kafka |
@@ -147,6 +147,6 @@ that it fails when I take the fix out, and passes with it in.
 
 ## What I would add next
 
-Snapshots so long account histories load faster, fraud alerts on their own Kafka topic,
-processing Kafka partitions in parallel, and Prometheus
+Snapshots so long account histories load faster, processing Kafka partitions in parallel,
+and Prometheus
 dashboards for lag and backlog.
